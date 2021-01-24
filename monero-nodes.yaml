@@ -1,0 +1,111 @@
+
+- hosts: all
+  tasks:
+
+  - name: Allow ssh
+    ufw:
+      rule: allow
+      port: ssh
+      proto: tcp
+
+  - name: Allow monerod p2p port tcp port 18080
+    ufw:
+      rule: allow
+      port: '18080'
+      proto: tcp
+  
+  - name: Allow monerod restricted RPC port
+    ufw:
+      rule: allow
+      port: '18089'
+      proto: tcp
+
+  - name: Allow everything and enable UFW
+    ufw:
+      state: enabled
+      policy: deny
+
+  - name: Add group "monero" to remote server
+    group:
+       name: monero
+       gid: 2012
+       state: present 
+  
+  - name: Add user "monero" to remote server
+    user:
+       name: monero
+       uid: 2001
+       group: monero
+       shell: /bin/bash
+
+  - name: Creating a new directory
+    file:
+      path: /var/run/monero
+      owner: monero
+      group: monero
+      state: directory
+  
+  - name: Creating a new directory
+    file:
+      path: /var/log/monero
+      owner: monero
+      group: monero
+      state: directory
+  
+  - name: Creating a new directory
+    file:
+      path: /etc/monero
+      owner: monero
+      group: monero
+      state: directory
+
+  - name: Creating monero config file
+    file:
+      path: /etc/monero/monerod.conf
+      owner: monero
+      group: monero
+      state: touch
+
+  - name: Copy monero node configuration file from template
+    template:
+      src: monero.conf.j2
+      dest: /etc/monero/monerod.conf
+
+  - name: Creating monero service config file
+    file:
+      path: /etc/systemd/system/monerod.service
+      owner: monero
+      group: monero
+      state: touch
+  
+  - name: Copy monero service configuration file from template
+    template:
+      src: monerod.service.j2
+      dest: /etc/systemd/system/monerod.service
+
+  - name: Download latest 64-bit binaries
+    get_url: url=https://downloads.getmonero.org/cli/linux64 dest=/tmp/monero-linux-x64.tar.bz2
+
+  - name: Unarchive
+    unarchive:
+      remote_src: yes
+      src: /tmp/monero-linux-x64.tar.bz2
+      dest: /usr/local/bin/
+      owner: monero
+  
+  - name: Copying monerod
+    copy:
+      remote_src: yes
+      src: /usr/local/bin/monero-x86_64-linux-gnu-v0.17.1.9/monerod
+      dest: /usr/local/bin/
+      owner: monero
+      group: monero
+      mode: 0777
+
+
+  - name: Load the new systemd script for monerod and start the monerod service
+    systemd:
+      state: restarted
+      enabled: yes
+      daemon_reload: yes
+      name: monerod
